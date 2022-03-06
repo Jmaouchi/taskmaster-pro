@@ -101,22 +101,16 @@ $(".list-group").on("blur", "textarea", function() {
   var text = $(this).val();
 
   // get status type and position in the list
-  var status = $(this)
-    .closest(".list-group")
-    .attr("id")
-    .replace("list-", "");
-  var index = $(this)
-    .closest(".list-group-item")
-    .index();
+  var status = $(this).closest(".list-group").attr("id").replace("list-", "");
+
+  var index = $(this).closest(".list-group-item").index();
 
   // update task in array and re-save to localstorage
   tasks[status][index].text = text;
   saveTasks();
 
   // recreate p element
-  var taskP = $("<p>")
-    .addClass("m-1")
-    .text(text);
+  var taskP = $("<p>").addClass("m-1").text(text);
 
   // replace textarea with new content
   $(this).replaceWith(taskP);
@@ -125,15 +119,10 @@ $(".list-group").on("blur", "textarea", function() {
 // due date was clicked
 $(".list-group").on("click", "span", function() {
   // get current text
-  var date = $(this)
-    .text()
-    .trim();
+  var date = $(this).text().trim();
 
   // create new input element
-  var dateInput = $("<input>")
-    .attr("type", "text")
-    .addClass("form-control")
-    .val(date);
+  var dateInput = $("<input>").attr("type", "text").addClass("form-control").val(date);
   $(this).replaceWith(dateInput);
 
   // automatically bring up the calendar
@@ -145,22 +134,15 @@ $(".list-group").on("blur", "input[type='text']", function() {
   var date = $(this).val();
 
   // get status type and position in the list
-  var status = $(this)
-    .closest(".list-group")
-    .attr("id")
-    .replace("list-", "");
-  var index = $(this)
-    .closest(".list-group-item")
-    .index();
+  var status = $(this).closest(".list-group").attr("id").replace("list-", "");
+  var index = $(this).closest(".list-group-item").index();
 
   // update task in array and re-save to localstorage
   tasks[status][index].date = date;
   saveTasks();
 
   // recreate span and insert in place of input element
-  var taskSpan = $("<span>")
-    .addClass("badge badge-primary badge-pill")
-    .text(date);
+  var taskSpan = $("<span>").addClass("badge badge-primary badge-pill").text(date);
     $(this).replaceWith(taskSpan);
 });
 
@@ -177,3 +159,60 @@ $("#remove-tasks").on("click", function() {
 loadTasks();
 
 
+// added sortable to the ul, and every ul with this className can be sorted and moved around.
+$(".card .list-group").sortable({
+  connectWith: $(".card .list-group"),
+  scroll: false,
+  tolerance: "pointer",
+  helper: "clone",
+  // event of the sortabe widget. you can look them up later
+  activate: function(event) {
+  },
+  deactivate: function(event) {
+  },
+  over: function(event) {
+  },
+  out: function(event) {
+  },
+  update: function(event) {
+
+    // array to store the task data in
+    var tempArr = [];
+
+    // loop over current set of children in sortable list
+    $(this).children().each(function() { // here we are trying to see all the child elements of the sorted element and then, we can get the text value and the span value
+      // then we can push them to our new array that is created whis is tempArr
+      var text = $(this).find("p").text().trim();
+  
+      var date = $(this).find("span").text().trim();
+
+      // add task data to the temp array as an object
+      tempArr.push({text: text, date: date});
+      console.log(tempArr);
+    });
+
+    // trim down list's ID to match object property
+    var arrName = $(this).attr("id").replace("list-", "");
+
+    // update array on tasks object and save
+    tasks[arrName] = tempArr;
+    saveTasks();
+  }
+});
+
+  $("#trash").droppable({ //we didnt add the saveTask(), cause we already calling it on the sortable function, and this droppable function is done inside the sortable function
+    // cause while dropping is moving the item from it place and that is a sortable at the same time.
+    accept: ".card .list-group-item",
+    tolerance: "touch",
+    // event of the droppable widget. you can look them up later
+    drop: function(event, ui) {
+      ui.draggable.remove();
+      console.log("drop");
+    },
+    over: function(event, ui) {
+      console.log("over");
+    },
+    out: function(event, ui) {
+      console.log("out");
+    }
+});
