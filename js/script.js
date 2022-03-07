@@ -3,16 +3,14 @@ var tasks = {};
 var createTask = function(taskText, taskDate, taskList) {
   // create elements that make up a task item
   var taskLi = $("<li>").addClass("list-group-item");
-  var taskSpan = $("<span>")
-    .addClass("badge badge-primary badge-pill")
-    .text(taskDate);
-  var taskP = $("<p>")
-    .addClass("m-1")
-    .text(taskText);
+  var taskSpan = $("<span>").addClass("badge badge-primary badge-pill").text(taskDate);
+  var taskP = $("<p>").addClass("m-1").text(taskText);
 
   // append span and p element to parent li
   taskLi.append(taskSpan, taskP);
 
+  // check due date
+  auditTask(taskLi);
 
   // append to ul list on the page
   $("#list-" + taskList).append(taskLi);
@@ -33,7 +31,6 @@ var loadTasks = function() {
 
   // loop over object properties
   $.each(tasks, function(list, arr) {
-    console.log(list, arr);
     // then loop over sub-array
     arr.forEach(function(task) {
       createTask(task.text, task.date, list);
@@ -45,8 +42,99 @@ var saveTasks = function() {
   localStorage.setItem("tasks", JSON.stringify(tasks));
 };
 
+var auditTask = function(taskEl) {
 
+  // get date from task element
+  var date = $(taskEl).find("span").text().trim();
 
+  console.log(date);
+
+  // convert to moment object at 5:00pm
+  var time = moment(date, "L").set("hour", 17);
+
+  // remove any old classes from element
+  $(taskEl).removeClass("list-group-item-warning list-group-item-danger"); // this will add the whole classe for the element and with the if and else we can sort these classes based by the time 
+
+  // apply new class if task is near/over due date
+  if (moment().isAfter(time)) {
+    $(taskEl).addClass("list-group-item-danger");
+  } 
+  else if (Math.abs(moment().diff(time, "days")) <= 2) {
+    $(taskEl).addClass("list-group-item-warning");
+  }
+
+  console.log(taskEl)
+};
+
+// enable draggable/sortable feature on list-group elements
+$(".card .list-group").sortable({
+  // enable dragging across lists
+  connectWith: $(".card .list-group"),
+  scroll: false,
+  tolerance: "pointer",
+  helper: "clone",
+  activate: function(event, ui) {
+    $(this).addClass('dropover');  // this will add the background color to all the element that has the classname .. when we move the box list
+    $(".bottom-trash").addClass("bottom-trash-drag");
+  },
+  deactivate: function(event, ui) {
+    $(this).removeClass('dropover'); // this will remove the background color when we stop clicking the box list
+    $(".bottom-trash").removeClass("bottom-trash-drag");
+  },
+  over: function(event) {
+    $(event.target).addClass('dropover-active'); // this will add a background color to the element that we want to move the box to 
+  },
+  out: function(event) {
+    $(event.target).removeClass('dropover-active'); // this will remove a background color on the element that we want to move the box from
+  },
+  update: function() {
+    var tempArr = [];
+
+    // loop over current set of children in sortable list
+    $(this).children().each(function() { /// here we are trying to see all the child elements of the sorted element and then, we can get the text value and the span value
+        // then we can push them to our new array that is created whis is tempArr
+        // save values in temp array
+        tempArr.push({
+          text: $(this).find("p").text().trim(),
+          date: $(this).find("span").text().trim()
+        });
+      });
+
+    // trim down list's ID to match object property
+    var arrName = $(this).attr("id").replace("list-", "");
+
+    // update array on tasks object and save
+    tasks[arrName] = tempArr;
+    saveTasks();
+  },
+  stop: function(event) {
+    $(this).removeClass("dropover");
+  }
+});
+
+// trash icon can be dropped onto
+$("#trash").droppable({ //we didnt add the saveTask(), cause we already calling it on the sortable function, and this droppable function is done inside the sortable function
+  // cause while dropping is moving the item from it place and that is a sortable at the same time.
+  accept: ".card .list-group-item",
+  accept: ".card .list-group-item",
+  tolerance: "touch",
+  drop: function(event, ui) {
+    // remove dragged element from the dom
+    ui.draggable.remove();
+  },
+  over: function(event, ui) {
+    $(".bottom-trash").addClass("bottom-trash-active");
+  },
+  out: function(event, ui) {
+    $(".bottom-trash").removeClass("bottom-trash-active");
+  }
+});
+
+// convert text field into a jquery date picker
+$("#modalDueDate").datepicker({
+  // force user to select a future date
+  minDate: 1
+});
 
 // modal was triggered
 $("#task-form-modal").on("show.bs.modal", function() {
@@ -61,7 +149,7 @@ $("#task-form-modal").on("shown.bs.modal", function() {
 });
 
 // save button in modal was clicked
-$("#task-form-modal .btn-primary").click(function() {
+$("#task-form-modal .btn-save").click(function() {
   // get form values
   var taskText = $("#modalTaskDescription").val();
   var taskDate = $("#modalDueDate").val();
@@ -92,7 +180,7 @@ $(".list-group").on("click", "p", function() {
   $(this).replaceWith(textInput);
 
   // auto focus new element
-  textInput.trigger("focus");
+  textInput.trigger("focus"); //used to trigger a specified event handler on selected element. 
 });
 
 // editable field was un-focused
@@ -102,7 +190,6 @@ $(".list-group").on("blur", "textarea", function() {
 
   // get status type and position in the list
   var status = $(this).closest(".list-group").attr("id").replace("list-", "");
-
   var index = $(this).closest(".list-group-item").index();
 
   // update task in array and re-save to localstorage
@@ -125,12 +212,21 @@ $(".list-group").on("click", "span", function() {
   var dateInput = $("<input>").attr("type", "text").addClass("form-control").val(date);
   $(this).replaceWith(dateInput);
 
+  // enable jquery ui date picker
+  dateInput.datepicker({
+    minDate: 1,
+    onClose: function() {
+      // when calendar is closed, force a "change" event
+      $(this).trigger("change");
+    }
+  });
+
   // automatically bring up the calendar
   dateInput.trigger("focus");
 });
 
 // value of due date was changed
-$(".list-group").on("blur", "input[type='text']", function() {
+$(".list-group").on("change", "input[type='text']", function() {
   var date = $(this).val();
 
   // get status type and position in the list
@@ -144,6 +240,7 @@ $(".list-group").on("blur", "input[type='text']", function() {
   // recreate span and insert in place of input element
   var taskSpan = $("<span>").addClass("badge badge-primary badge-pill").text(date);
     $(this).replaceWith(taskSpan);
+    auditTask($(taskSpan).closest(".list-group-item"));
 });
 
 // remove all tasks
@@ -152,67 +249,17 @@ $("#remove-tasks").on("click", function() {
     tasks[key].length = 0;
     $("#list-" + key).empty();
   }
+  console.log(tasks);
   saveTasks();
 });
 
-// load tasks for the first time
+
+setInterval(function () { //In this interval, we loop over every task on the page with a 
+  //class of list-group-item and execute the auditTask() function to check the due date of each one.
+  $(".card .list-group-item").each(function(index, el) {
+    auditTask(el);
+  });
+}, 1800000);
+
+// load tasks for the first time. this function need to be called at the end of the script and if not, it wont get anything from ls
 loadTasks();
-
-
-// added sortable to the ul, and every ul with this className can be sorted and moved around.
-$(".card .list-group").sortable({
-  connectWith: $(".card .list-group"),
-  scroll: false,
-  tolerance: "pointer",
-  helper: "clone",
-  // event of the sortabe widget. you can look them up later
-  activate: function(event) {
-  },
-  deactivate: function(event) {
-  },
-  over: function(event) {
-  },
-  out: function(event) {
-  },
-  update: function(event) {
-
-    // array to store the task data in
-    var tempArr = [];
-
-    // loop over current set of children in sortable list
-    $(this).children().each(function() { // here we are trying to see all the child elements of the sorted element and then, we can get the text value and the span value
-      // then we can push them to our new array that is created whis is tempArr
-      var text = $(this).find("p").text().trim();
-  
-      var date = $(this).find("span").text().trim();
-
-      // add task data to the temp array as an object
-      tempArr.push({text: text, date: date});
-      console.log(tempArr);
-    });
-
-    // trim down list's ID to match object property
-    var arrName = $(this).attr("id").replace("list-", "");
-
-    // update array on tasks object and save
-    tasks[arrName] = tempArr;
-    saveTasks();
-  }
-});
-
-  $("#trash").droppable({ //we didnt add the saveTask(), cause we already calling it on the sortable function, and this droppable function is done inside the sortable function
-    // cause while dropping is moving the item from it place and that is a sortable at the same time.
-    accept: ".card .list-group-item",
-    tolerance: "touch",
-    // event of the droppable widget. you can look them up later
-    drop: function(event, ui) {
-      ui.draggable.remove();
-      console.log("drop");
-    },
-    over: function(event, ui) {
-      console.log("over");
-    },
-    out: function(event, ui) {
-      console.log("out");
-    }
-});
